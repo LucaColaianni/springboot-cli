@@ -12,11 +12,21 @@ public class ProjectDownloaderImpl implements ProjectDownloader {
         String currentDir = System.getProperty("user.dir");
         System.out.println("Current directory: " + currentDir);
 
+        // Creazione della cartella STAGING se non esiste
+        String stagingDir = currentDir + File.separator + "STAGING";
+        File stagingFolder = new File(stagingDir);
+        if (!stagingFolder.exists()) {
+            stagingFolder.mkdirs();
+            System.out.println("STAGING directory created at: " + stagingDir);
+        } else {
+            System.out.println("STAGING directory already exists at: " + stagingDir);
+        }
+
         String downloadUrl = buildSpringInitializrUrl(groupId, artifactId, projectName);
         System.out.println("Downloading project from: " + downloadUrl);
 
         byte[] zipContent = downloadProject(downloadUrl);
-        String zipFileName = currentDir + File.separator + projectName + ".zip";
+        String zipFileName = stagingDir + File.separator + projectName + ".zip";
         saveZip(zipContent, zipFileName);
 
         System.out.println("Project successfully downloaded to: " + zipFileName);
@@ -40,7 +50,6 @@ public class ProjectDownloaderImpl implements ProjectDownloader {
                 "&dependencies=lombok";
     }
 
-
     private byte[] downloadProject(String url) throws IOException {
         HttpURLConnection connection = (HttpURLConnection) new URL(url).openConnection();
         connection.setRequestMethod("GET");
@@ -55,6 +64,7 @@ public class ProjectDownloaderImpl implements ProjectDownloader {
             return outputStream.toByteArray();
         }
     }
+
     private void saveZip(byte[] zipContent, String outputPath) throws IOException {
         try (FileOutputStream fos = new FileOutputStream(outputPath)) {
             fos.write(zipContent);

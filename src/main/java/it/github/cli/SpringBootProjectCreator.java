@@ -45,8 +45,8 @@ public class SpringBootProjectCreator implements Runnable {
             downloader.downloadProject(groupId, artifactId, projectName, "");
 
             String currentDir = System.getProperty("user.dir");
-            String zipFilePath = currentDir + File.separator + projectName + ".zip";
-            String projectDir = currentDir + File.separator + projectName;
+            String zipFilePath = currentDir + "/STAGING" + File.separator + projectName + ".zip";
+            String projectDir = currentDir + "/STAGING" + File.separator + projectName;
 
             ClassGenererator classGenerator = new ClassGeneratorImpl();
             classGenerator.generateTestClass(zipFilePath, projectDir, groupId, artifactId);
