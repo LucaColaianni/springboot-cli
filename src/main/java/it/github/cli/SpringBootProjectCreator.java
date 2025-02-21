@@ -1,10 +1,13 @@
 package it.github.cli;
 
+import it.github.cli.interfaces.ClassGenererator;
 import it.github.cli.interfaces.ProjectDownloader;
+import it.github.cli.service.ClassGeneratorImpl;
 import it.github.cli.service.ProjectDownloaderImpl;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 
+import java.io.File;
 import java.util.Scanner;
 
 @Command(name = "spring-boot-creator", mixinStandardHelpOptions = true, version = "1.0",
@@ -40,6 +43,14 @@ public class SpringBootProjectCreator implements Runnable {
         ProjectDownloader downloader = new ProjectDownloaderImpl();
         try {
             downloader.downloadProject(groupId, artifactId, projectName, "");
+
+            String currentDir = System.getProperty("user.dir");
+            String zipFilePath = currentDir + File.separator + projectName + ".zip";
+            String projectDir = currentDir + File.separator + projectName;
+
+            ClassGenererator classGenerator = new ClassGeneratorImpl();
+            classGenerator.generateTestClass(zipFilePath, projectDir, groupId, artifactId);
+
         } catch (Exception e) {
             System.err.println("Error downloading project: " + e.getMessage());
             e.printStackTrace();
