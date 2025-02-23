@@ -13,52 +13,97 @@ public class ClassGeneratorImpl implements ClassGenerator {
     private static final String TEST_DIR_PATH = "src/test/java";
     private static final String MAIN_DIR_PATH = "src/main/java";
     private static final String CONFIG_DIR = "config";
-    private static final String[] SOURCE_PACKAGES = {"entity", "repository", "service", "controller"};
+
 
     @Override
     public void generateClasses(String projectZipPath, ProjectConfig config) throws IOException {
+        // Estrae il progetto dallo zip
         String projectDir = extractProject(projectZipPath, config);
-        String packagePath = determinePackagePath(config);
 
-        File configDir = createDirectory(projectDir, TEST_DIR_PATH, packagePath, CONFIG_DIR);
-        generateAllTestClasses(configDir, config);
-        generateSourcePackagesWithClasses(projectDir, packagePath, config);
+        // Definiamo la cartella "src/main/java" come radice per i sorgenti
+        File srcMainJavaDir = new File(projectDir, MAIN_DIR_PATH);
+        // Proviamo a trovare ricorsivamente la directory in cui è presente la classe Application
+        File baseSourceDir = findBasePackageDirectory(srcMainJavaDir);
+        if (baseSourceDir == null) {
+            // Se non troviamo la Application, usiamo come fallback il package calcolato
+            String basePackageName = buildPackageName(config);
+            String basePackagePath = basePackageName.replace(".", File.separator);
+            baseSourceDir = new File(srcMainJavaDir, basePackagePath);
+            if (!baseSourceDir.exists()) {
+                baseSourceDir.mkdirs();
+            }
+        }
+
+        // Calcoliamo il package a partire dal percorso relativo a src/main/java
+        String basePackage = getPackageFromPath(srcMainJavaDir, baseSourceDir);
+
+        // Per i test, ricostruiamo la directory di base usando la stessa struttura
+        File srcTestJavaDir = new File(projectDir, TEST_DIR_PATH);
+        File baseTestDir = new File(srcTestJavaDir, basePackage.replace(".", File.separator));
+        if (!baseTestDir.exists()) {
+            baseTestDir.mkdirs();
+        }
+        // Creiamo (se non esiste) la directory "config" per i test
+        File testConfigDir = new File(baseTestDir, CONFIG_DIR);
+        if (!testConfigDir.exists()) {
+            testConfigDir.mkdirs();
+        }
+
+        // Genera le classi di test nella cartella individuata
+        generateAllTestClasses(testConfigDir, config);
+        // Genera le classi dei componenti (controller, service, repository, entity) in baseSourceDir
+        generateSourcePackagesWithClasses(baseSourceDir, basePackage);
+        // Genera il file application.properties di template in src/main/resources
+        generateApplicationProperties(projectDir, config);
+        // Genera il file application-test.properties per i test in src/test/resources
+        generateTestApplicationProperties(projectDir, config);
     }
 
-    private void generateSourcePackagesWithClasses(String projectDir, String packagePath, ProjectConfig config) throws IOException {
-        String basePackage = buildPackageName(config);
+
+    private void generateSourcePackagesWithClasses(File baseSourceDir, String basePackage) throws IOException {
+        // Per ogni sottocartella, crea la directory (se non esiste) e genera la classe corrispondente
 
         // Controller
-        File controllerDir = createDirectory(projectDir, MAIN_DIR_PATH, packagePath, "controller");
+        File controllerDir = new File(baseSourceDir, "controller");
+        if (!controllerDir.exists()) {
+            controllerDir.mkdirs();
+        }
         generateControllerClass(controllerDir, basePackage);
 
         // Service
-        File serviceDir = createDirectory(projectDir, MAIN_DIR_PATH, packagePath, "service");
+        File serviceDir = new File(baseSourceDir, "service");
+        if (!serviceDir.exists()) {
+            serviceDir.mkdirs();
+        }
         generateServiceClass(serviceDir, basePackage);
 
         // Repository
-        File repositoryDir = createDirectory(projectDir, MAIN_DIR_PATH, packagePath, "repository");
+        File repositoryDir = new File(baseSourceDir, "repository");
+        if (!repositoryDir.exists()) {
+            repositoryDir.mkdirs();
+        }
         generateRepositoryClass(repositoryDir, basePackage);
 
         // Entity
-        File entityDir = createDirectory(projectDir, MAIN_DIR_PATH, packagePath, "entity");
+        File entityDir = new File(baseSourceDir, "entity");
+        if (!entityDir.exists()) {
+            entityDir.mkdirs();
+        }
         generateEntityClass(entityDir, basePackage);
     }
 
     private void generateControllerClass(File dir, String basePackage) throws IOException {
         String content = String.format("""
                 package %s.controller;
-                            
+                                
                 import org.springframework.web.bind.annotation.RestController;
                 import org.springframework.web.bind.annotation.RequestMapping;
-                            
+                                
                 @RestController
                 @RequestMapping("/api")
                 public class Controller {
+                                    
                     
-                    public Controller() {
-                        System.out.println("Controller initialized");
-                    }
                 }
                 """, basePackage);
         writeClassFile(dir, "Controller.java", content);
@@ -67,15 +112,12 @@ public class ClassGeneratorImpl implements ClassGenerator {
     private void generateServiceClass(File dir, String basePackage) throws IOException {
         String content = String.format("""
                 package %s.service;
-                            
+                                
                 import org.springframework.stereotype.Service;
-                            
+                                
                 @Service
                 public class Service {
-                    
-                    public Service() {
-                        System.out.println("Service initialized");
-                    }
+                                    
                 }
                 """, basePackage);
         writeClassFile(dir, "Service.java", content);
@@ -84,15 +126,11 @@ public class ClassGeneratorImpl implements ClassGenerator {
     private void generateRepositoryClass(File dir, String basePackage) throws IOException {
         String content = String.format("""
                 package %s.repository;
-                            
+                                
                 import org.springframework.stereotype.Repository;
-                            
-                @Repository
-                public class Repository {
-                    
-                    public Repository() {
-                        System.out.println("Repository initialized");
-                    }
+                                
+                public interface Repository {
+                                    
                 }
                 """, basePackage);
         writeClassFile(dir, "Repository.java", content);
@@ -101,111 +139,148 @@ public class ClassGeneratorImpl implements ClassGenerator {
     private void generateEntityClass(File dir, String basePackage) throws IOException {
         String content = String.format("""
                 package %s.entity;
-                            
+                                
                 import jakarta.persistence.Entity;
                 import jakarta.persistence.Id;
                 import jakarta.persistence.GeneratedValue;
                 import jakarta.persistence.GenerationType;
-                            
+                                
                 @Entity
                 public class Entity {
                     @Id
                     @GeneratedValue(strategy = GenerationType.IDENTITY)
                     private Long id;
-                    
-                    public Entity() {
-                        System.out.println("Entity initialized");
-                    }
+                                    
                 }
                 """, basePackage);
         writeClassFile(dir, "Entity.java", content);
     }
 
-    private void createSourcePackages(String projectDir, String packagePath) {
-        for (String packageName : SOURCE_PACKAGES) {
-            File packageDir = createDirectory(projectDir, MAIN_DIR_PATH, packagePath, packageName);
-            System.out.println("Created source package: " + packageDir.getAbsolutePath());
-        }
-    }
-
-
-    private File createDirectory(String baseDir, String sourcePath, String packagePath, String targetDir) {
-        File dir = new File(baseDir, sourcePath + File.separator + packagePath + File.separator + targetDir);
-        if (!dir.exists() && dir.mkdirs()) {
-            System.out.println("Created directory: " + dir.getAbsolutePath());
-        }
-        return dir;
-    }
-
     private void generateAllTestClasses(File configDir, ProjectConfig config) throws IOException {
-        String packageName = buildPackageName(config);
-
-        generateBaseTest(configDir, packageName);
-        generateBaseUnitTest(configDir, packageName);
-        generateBaseE2ETest(configDir, packageName);
-        generateBaseIntegrationTest(configDir, packageName);
+        String basePackage = buildPackageName(config);
+        generateBaseTest(configDir, basePackage);
+        generateBaseUnitTest(configDir, basePackage);
+        generateBaseE2ETest(configDir, basePackage);
+        generateBaseIntegrationTest(configDir, basePackage);
     }
 
-    // [Previous methods remain unchanged]
     private void generateBaseTest(File configDir, String packageName) throws IOException {
         String content = String.format("""
                 package %s.config;
-                            
+                                
                 import org.springframework.boot.test.context.SpringBootTest;
                 import org.springframework.test.context.TestPropertySource;
-                            
+                                
                 @SpringBootTest(properties = "spring.main.banner-mode=off")
                 @TestPropertySource({"classpath:application-test.properties"})
                 public abstract class BaseTest {
                 }
                 """, packageName);
-
         writeClassFile(configDir, "BaseTest.java", content);
     }
 
     private void generateBaseUnitTest(File configDir, String packageName) throws IOException {
         String content = String.format("""
                 package %s.config;
-                            
+                                
                 import org.junit.jupiter.api.extension.ExtendWith;
                 import org.mockito.junit.jupiter.MockitoExtension;
-                            
+                                
                 @ExtendWith(MockitoExtension.class)
                 public abstract class BaseUnitTest extends BaseTest {
                 }
                 """, packageName);
-
         writeClassFile(configDir, "BaseUnitTest.java", content);
     }
 
     private void generateBaseE2ETest(File configDir, String packageName) throws IOException {
         String content = String.format("""
                 package %s.config;
-                            
+                                
                 import org.springframework.boot.test.context.SpringBootTest;
                 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
-                            
+                                
                 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
                 @AutoConfigureMockMvc
                 public abstract class BaseE2ETest extends BaseTest {
                 }
                 """, packageName);
-
         writeClassFile(configDir, "BaseE2ETest.java", content);
     }
 
     private void generateBaseIntegrationTest(File configDir, String packageName) throws IOException {
         String content = String.format("""
                 package %s.config;
-                            
+                                
                 import org.springframework.boot.test.context.SpringBootTest;
-                            
+                                
                 @SpringBootTest
                 public abstract class BaseIntegrationTest extends BaseTest {
                 }
                 """, packageName);
-
         writeClassFile(configDir, "BaseIntegrationTest.java", content);
+    }
+
+    private void generateApplicationProperties(String projectDir, ProjectConfig config) throws IOException {
+        // Definiamo la cartella delle risorse
+        File resourcesDir = new File(projectDir, "src/main/resources");
+        if (!resourcesDir.exists()) {
+            resourcesDir.mkdirs();
+        }
+
+        File appPropsFile = new File(resourcesDir, "application.properties");
+        // Creiamo un template di application.properties
+        String content = String.format("""
+        spring.application.name=%s
+        server.port=8080
+
+        # MySQL Database Configuration
+        #spring.datasource.url=jdbc:mysql://localhost:3306/your_db_name?useSSL=false&serverTimezone=UTC
+        #spring.datasource.username=your_username
+        #spring.datasource.password=your_password
+        #spring.datasource.driver-class-name=com.mysql.cj.jdbc.Driver
+
+        # JPA/Hibernate Configuration
+        #spring.jpa.hibernate.ddl-auto=update
+        #spring.jpa.show-sql=true
+        #spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.MySQL8Dialect
+        """, config.getProjectName());
+
+        try (BufferedWriter writer = new BufferedWriter(new FileWriter(appPropsFile))) {
+            writer.write(content);
+        }
+        System.out.println("Generated: " + appPropsFile.getAbsolutePath());
+    }
+
+    private void generateTestApplicationProperties(String projectDir, ProjectConfig config) throws IOException {
+        // Definiamo la cartella delle risorse per i test
+        File testResourcesDir = new File(projectDir, "src/test/resources");
+        if (!testResourcesDir.exists()) {
+            testResourcesDir.mkdirs();
+        }
+        File testAppPropsFile = new File(testResourcesDir, "application-test.properties");
+        String content = String.format("""
+                spring.application.name=%s
+                                       
+                # Setup database H2
+                spring.datasource.url=jdbc:h2:mem:your_database_name
+                spring.datasource.username=your_username
+                spring.datasource.password=your_password
+                spring.datasource.driver-class-name=org.h2.Driver
+                spring.jpa.database-platform=org.hibernate.dialect.H2Dialect
+                
+                spring.jpa.show-sql=true
+                
+                spring.jpa.hibernate.ddl-auto=none
+                spring.sql.init.mode=always
+                spring.sql.init.schema-locations=classpath:schema.sql
+                spring.sql.init.data-locations=classpath:data.sql
+                """, config.getProjectName());
+
+        try (BufferedWriter writer = new BufferedWriter(new FileWriter(testAppPropsFile))) {
+            writer.write(content);
+        }
+        System.out.println("Generated: " + testAppPropsFile.getAbsolutePath());
     }
 
     private void writeClassFile(File directory, String fileName, String content) throws IOException {
@@ -222,18 +297,50 @@ public class ClassGeneratorImpl implements ClassGenerator {
         return projectDir;
     }
 
-    private String determinePackagePath(ProjectConfig config) {
+    private String buildPackageName(ProjectConfig config) {
+        // Se artifactId corrisponde all'ultimo token del groupId, il package base sarà solo il groupId,
+        // altrimenti sarà groupId.artifactId
         String lastToken = config.getGroupId().substring(config.getGroupId().lastIndexOf('.') + 1);
-        String packageName = config.getArtifactId().equalsIgnoreCase(lastToken) ?
-                config.getGroupId() :
-                config.getGroupId() + "." + config.getArtifactId();
-        return packageName.replace(".", File.separator);
+        return config.getArtifactId().equalsIgnoreCase(lastToken)
+                ? config.getGroupId()
+                : config.getGroupId() + "." + config.getArtifactId();
     }
 
-    private String buildPackageName(ProjectConfig config) {
-        String lastToken = config.getGroupId().substring(config.getGroupId().lastIndexOf('.') + 1);
-        return config.getArtifactId().equalsIgnoreCase(lastToken) ?
-                config.getGroupId() :
-                config.getGroupId() + "." + config.getArtifactId();
+    /**
+     * Cerca ricorsivamente in 'dir' la directory che contiene un file che termina con "Application.java".
+     */
+    private File findBasePackageDirectory(File dir) {
+        if (dir.isDirectory()) {
+            File[] files = dir.listFiles();
+            if (files != null) {
+                for (File file : files) {
+                    if (file.isDirectory()) {
+                        File result = findBasePackageDirectory(file);
+                        if (result != null) {
+                            return result;
+                        }
+                    } else if (file.getName().endsWith("Application.java")) {
+                        return file.getParentFile();
+                    }
+                }
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Calcola il package in notazione dot a partire dalla directory base dei sorgenti.
+     * Ad esempio, se srcMainJavaDir = ".../src/main/java" e baseDir = ".../src/main/java/it/github/myapp",
+     * restituisce "it.github.myapp".
+     */
+    private String getPackageFromPath(File srcMainJavaDir, File baseDir) {
+        String srcMainPath = srcMainJavaDir.getAbsolutePath();
+        String basePath = baseDir.getAbsolutePath();
+        // Rimuoviamo il percorso della radice e sostituiamo i separatori con il punto
+        String relative = basePath.substring(srcMainPath.length());
+        if (relative.startsWith(File.separator)) {
+            relative = relative.substring(1);
+        }
+        return relative.replace(File.separator, ".");
     }
 }
