@@ -104,12 +104,12 @@ public class ClassGeneratorImpl implements ClassGenerator {
                                 
                 @RestController
                 @RequestMapping("/api")
-                public class Controller {
+                public class TempController {
                                     
                     
                 }
                 """, basePackage);
-        writeClassFile(dir, "Controller.java", content);
+        writeClassFile(dir, "TempController.java", content);
     }
 
     private void generateServiceClass(File dir, String basePackage) throws IOException {
@@ -119,11 +119,11 @@ public class ClassGeneratorImpl implements ClassGenerator {
                 import org.springframework.stereotype.Service;
                                 
                 @Service
-                public class Service {
+                public class TempService {
                                     
                 }
                 """, basePackage);
-        writeClassFile(dir, "Service.java", content);
+        writeClassFile(dir, "TempService.java", content);
     }
 
     private void generateRepositoryClass(File dir, String basePackage) throws IOException {
@@ -132,11 +132,11 @@ public class ClassGeneratorImpl implements ClassGenerator {
                                 
                 import org.springframework.stereotype.Repository;
                                 
-                public interface Repository {
+                public interface TempRepository {
                                     
                 }
                 """, basePackage);
-        writeClassFile(dir, "Repository.java", content);
+        writeClassFile(dir, "TempRepository.java", content);
     }
 
     private void generateEntityClass(File dir, String basePackage) throws IOException {
@@ -149,14 +149,14 @@ public class ClassGeneratorImpl implements ClassGenerator {
                 import jakarta.persistence.GenerationType;
                                 
                 @Entity
-                public class Entity {
+                public class TempEntity {
                     @Id
                     @GeneratedValue(strategy = GenerationType.IDENTITY)
                     private Long id;
                                     
                 }
                 """, basePackage);
-        writeClassFile(dir, "Entity.java", content);
+        writeClassFile(dir, "TempEntity.java", content);
     }
 
     private void generateAllTestClasses(File configDir, ProjectConfig config) throws IOException {
