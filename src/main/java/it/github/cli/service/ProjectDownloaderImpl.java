@@ -9,7 +9,7 @@ import java.net.URL;
 
 public class ProjectDownloaderImpl implements ProjectDownloader {
 
-    private static final String STAGING_DIR = "STAGING";
+    private static final String STAGING_DIR = "your Spring Boot project!";
     private static final String SPRING_INITIALIZR_URL = "https://start.spring.io/starter.zip";
 
     @Override

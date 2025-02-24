@@ -17,15 +17,15 @@ public class ClassGeneratorImpl implements ClassGenerator {
 
     @Override
     public void generateClasses(String projectZipPath, ProjectConfig config) throws IOException {
-        // Estrae il progetto dallo zip
+        // Extract the project from the zip file
         String projectDir = extractProject(projectZipPath, config);
 
-        // Definiamo la cartella "src/main/java" come radice per i sorgenti
+        // Define "src/main/java" as the root directory for sources
         File srcMainJavaDir = new File(projectDir, MAIN_DIR_PATH);
-        // Proviamo a trovare ricorsivamente la directory in cui è presente la classe Application
+        // Try to recursively find the directory containing the Application class
         File baseSourceDir = findBasePackageDirectory(srcMainJavaDir);
         if (baseSourceDir == null) {
-            // Se non troviamo la Application, usiamo come fallback il package calcolato
+            // If we don't find Application, use the computed package as a fallback
             String basePackageName = buildPackageName(config);
             String basePackagePath = basePackageName.replace(".", File.separator);
             baseSourceDir = new File(srcMainJavaDir, basePackagePath);
@@ -34,34 +34,37 @@ public class ClassGeneratorImpl implements ClassGenerator {
             }
         }
 
-        // Calcoliamo il package a partire dal percorso relativo a src/main/java
+        // Compute the package from the relative path to src/main/java
         String basePackage = getPackageFromPath(srcMainJavaDir, baseSourceDir);
 
-        // Per i test, ricostruiamo la directory di base usando la stessa struttura
+        // For tests, reconstruct the base directory using the same structure
         File srcTestJavaDir = new File(projectDir, TEST_DIR_PATH);
         File baseTestDir = new File(srcTestJavaDir, basePackage.replace(".", File.separator));
         if (!baseTestDir.exists()) {
             baseTestDir.mkdirs();
         }
-        // Creiamo (se non esiste) la directory "config" per i test
+        // Create (if it does not exist) the "config" directory for tests
         File testConfigDir = new File(baseTestDir, CONFIG_DIR);
         if (!testConfigDir.exists()) {
             testConfigDir.mkdirs();
         }
 
-        // Genera le classi di test nella cartella individuata
+        /**
+         * Here you can add a new method to generate other classes.
+         */
+        // Generate test classes in the identified folder
         generateAllTestClasses(testConfigDir, config);
-        // Genera le classi dei componenti (controller, service, repository, entity) in baseSourceDir
+        // Generate component classes (controller, service, repository, entity) in baseSourceDir
         generateSourcePackagesWithClasses(baseSourceDir, basePackage);
-        // Genera il file application.properties di template in src/main/resources
+        // Generate the application.properties template file in src/main/resources
         generateApplicationProperties(projectDir, config);
-        // Genera il file application-test.properties per i test in src/test/resources
+        // Generate the application-test.properties file for tests in src/test/resources
         generateTestApplicationProperties(projectDir, config);
     }
 
 
     private void generateSourcePackagesWithClasses(File baseSourceDir, String basePackage) throws IOException {
-        // Per ogni sottocartella, crea la directory (se non esiste) e genera la classe corrispondente
+        // For each subfolder, create the directory (if it does not exist) and generate the corresponding class
 
         // Controller
         File controllerDir = new File(baseSourceDir, "controller");
@@ -222,14 +225,14 @@ public class ClassGeneratorImpl implements ClassGenerator {
     }
 
     private void generateApplicationProperties(String projectDir, ProjectConfig config) throws IOException {
-        // Definiamo la cartella delle risorse
+        // Define the resources folder
         File resourcesDir = new File(projectDir, "src/main/resources");
         if (!resourcesDir.exists()) {
             resourcesDir.mkdirs();
         }
 
         File appPropsFile = new File(resourcesDir, "application.properties");
-        // Creiamo un template di application.properties
+        // Create a template for application.properties
         String content = String.format("""
         spring.application.name=%s
         server.port=8080
@@ -253,7 +256,7 @@ public class ClassGeneratorImpl implements ClassGenerator {
     }
 
     private void generateTestApplicationProperties(String projectDir, ProjectConfig config) throws IOException {
-        // Definiamo la cartella delle risorse per i test
+        // Define the test resources folder
         File testResourcesDir = new File(projectDir, "src/test/resources");
         if (!testResourcesDir.exists()) {
             testResourcesDir.mkdirs();
@@ -298,8 +301,8 @@ public class ClassGeneratorImpl implements ClassGenerator {
     }
 
     private String buildPackageName(ProjectConfig config) {
-        // Se artifactId corrisponde all'ultimo token del groupId, il package base sarà solo il groupId,
-        // altrimenti sarà groupId.artifactId
+        // If artifactId matches the last token of groupId, the base package will be just the groupId,
+        // otherwise, it will be groupId.artifactId
         String lastToken = config.getGroupId().substring(config.getGroupId().lastIndexOf('.') + 1);
         return config.getArtifactId().equalsIgnoreCase(lastToken)
                 ? config.getGroupId()
@@ -307,7 +310,7 @@ public class ClassGeneratorImpl implements ClassGenerator {
     }
 
     /**
-     * Cerca ricorsivamente in 'dir' la directory che contiene un file che termina con "Application.java".
+     * Recursively searches in 'dir' for the directory containing a file that ends with "Application.java".
      */
     private File findBasePackageDirectory(File dir) {
         if (dir.isDirectory()) {
@@ -329,14 +332,14 @@ public class ClassGeneratorImpl implements ClassGenerator {
     }
 
     /**
-     * Calcola il package in notazione dot a partire dalla directory base dei sorgenti.
-     * Ad esempio, se srcMainJavaDir = ".../src/main/java" e baseDir = ".../src/main/java/it/github/myapp",
-     * restituisce "it.github.myapp".
+     * Computes the package in dot notation from the base source directory.
+     * For example, if srcMainJavaDir = ".../src/main/java" and baseDir = ".../src/main/java/it/github/myapp",
+     * it returns "it.github.myapp".
      */
     private String getPackageFromPath(File srcMainJavaDir, File baseDir) {
         String srcMainPath = srcMainJavaDir.getAbsolutePath();
         String basePath = baseDir.getAbsolutePath();
-        // Rimuoviamo il percorso della radice e sostituiamo i separatori con il punto
+        // Remove the root path and replace separators with dots
         String relative = basePath.substring(srcMainPath.length());
         if (relative.startsWith(File.separator)) {
             relative = relative.substring(1);
